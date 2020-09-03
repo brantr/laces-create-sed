@@ -9,6 +9,10 @@
 #include "nebular_line_emission.h"
 #include <gsl/gsl_interp.h>
 
+#define CHECK_PHOT
+
+#define FAKE_FESC
+
 //#define FIT_LINE_STRENGTHS
 
 #define LINES
@@ -16,6 +20,19 @@
 
 char **load_z_met_filenames(void);
 void allocate_sed_buffers(void);
+
+double klambda_smc(double lambda)
+{
+  //note that lambda is in microns
+  double lambda_smc[31] = {0.09,0.116,0.119,0.123,0.127,0.131,0.136,0.140,0.145,0.151,0.157,0.163,0.170,0.178,0.186,0.195,0.205,0.216,0.229,0.242,0.258,0.276,0.296,0.370,0.440,0.550,0.660,0.810,1.250,1.650,2.198};
+  double k_smc[31] = {9.5,6.992,6.436,6.297,6.074,5.795,5.575,5.272,5.000,4.776,4.472,4.243,4.013,3.866,3.637,3.489,3.293,3.161,2.947,2.661,2.428,2.220,2.000,1.672,1.374,1.000,0.801,0.567,0.131,0.169,0.016};
+  double Rv_smc = 2.74; // gordon et al. 2003
+  int nlsmc = 31;
+  int    ki = gsl_interp_bsearch(lambda_smc,lambda,0,nlsmc);
+  double ksmc =  k_smc[ki] + (k_smc[ki+1] - k_smc[ki])*(lambda - lambda_smc[ki])/(lambda_smc[ki+1] - lambda_smc[ki]);
+  return ksmc * Rv_smc;
+}
+
 
 
 
@@ -27,6 +44,16 @@ int main(int argc, char **argv)
   double f_esc = 0.66;  //escape fraction
   double dm;
   double Nlyc;
+  double ebv = 0.0;
+
+  double    AEBV, kp; //dust attenuation
+
+  double lyman_limit = 912.0; //Ang
+
+#ifdef FAKE_FESC
+  lyman_limit = 970.;
+#endif
+
   flag_binary = 1; //binary population flag
 
   if(argc>=2)
@@ -38,8 +65,13 @@ int main(int argc, char **argv)
 	if(argc>=5)
 		f_esc = atof(argv[4]);
 #ifndef FIT_LINE_STRENGTHS
+
   if(argc>=6)
-    flag_binary = atoi(argv[5]);
+    ebv = atof(argv[5]);
+  if(argc>=7)
+    flag_binary = atoi(argv[6]);
+
+
 #else //FIT_LINE_STRENGTHS
   double B_line;
   if(argc>=6)
@@ -54,6 +86,8 @@ int main(int argc, char **argv)
   printf("A     = %f [Msun/yr]\n",A);
   printf("age   = %f [log10 yr]\n",agei);
   printf("f_esc = %f\n",f_esc);
+  printf("ebv   = %f\n",ebv);
+
 #ifndef FIT_LINE_STRENGTHS
   if(argc>=6)
     printf("flag_binary = %d\n",flag_binary);
@@ -151,7 +185,9 @@ int main(int argc, char **argv)
   int     k_age = gsl_interp_bsearch(age,agei,0,n_age-2);
   double dx_age = (agei - age[k_age])/(age[k_age+1] - age[k_age]);
 
-  //printf("dx_age %e\n",dx_age);
+#ifdef CHECK_PHOT
+  printf("PHOT k_age %d dx_age %e\n",k_age,dx_age);
+#endif //CHECK_PHOT
   //exit(0);
   Nlyc = log10(A)+((1.0-dx_age)*N_Lyc[0][k_age] + dx_age*N_Lyc[0][k_age+1]);
   printf("N_Lyc = %e\n",Nlyc);
@@ -265,6 +301,7 @@ int main(int argc, char **argv)
     f_tot = f_sed;
     f_tot_nl = f_sed;
 
+
 #ifdef LINES
     f_tot += (1.0-f_esc)*f_line;
 #endif 
@@ -273,16 +310,31 @@ int main(int argc, char **argv)
     f_tot_nl += (1.0-f_esc)*f_cont;
 
 #endif 
+
+
+    //apply dust 
+    kp = klambda_smc(lambda_line[i] * 1.0e-4);
+    if(lambda_line[i]  * 1.0e-4 < lyman_limit * 1.0e-4)
+      kp = 0.0;
+    AEBV = -0.4*ebv*kp;
+
+
+    f_tot    *= pow(10.0, AEBV);
+    f_tot_nl *= pow(10.0, AEBV);
+
+
+    //apply absorption
     f_tot *= absorption[i];
     f_tot_bare = f_tot;
     f_tot_nl *= absorption[i];
 
 
-    if(lambda_line[i]<=912.)
+    if(lambda_line[i]<=lyman_limit)
     {
       f_tot *= f_esc;
       f_tot_nl *= f_esc;
     }
+
 
     f_nu_tot[i] = f_tot;
     f_nu_tot_nl[i] = f_tot_nl;
@@ -403,7 +455,7 @@ int main(int argc, char **argv)
 
 
     //printf("BANDWIDTH for %d l_ave %f; width %f %f l_pb_lo %e l_pb_max %e l_pb_hi %e y_pb_max %e dn_pb %e check %e %e %e\n",l,l_pb_ave,(dnu_hi + dnu_lo)/oopz,(l_pb_hi - l_pb_lo)/oopz,l_pb_lo/oopz,l_pb_max/oopz,l_pb_hi/oopz,y_pb_max,dnu_pb,(l_pb_max-dnu_lo)/oopz,(dnu_hi+l_pb_max)/oopz,c*oopz/(l_pb_max-dnu_lo) + c*oopz/(l_pb_max+dnu_hi));
-    printf("BANDWIDTH for %d l_ave %f; width %f %f l_pb_lo %e l_pb_max %e l_pb_hi %e y_pb_max %e\n",l,l_pb_ave,(dlam_hi + dlam_lo)/oopz,(l_pb_hi - l_pb_lo)/oopz,l_pb_lo/oopz,l_pb_max/oopz,l_pb_hi/oopz,y_pb_max);
+    //printf("BANDWIDTH for %d l_ave %f; width %f %f l_pb_lo %e l_pb_max %e l_pb_hi %e y_pb_max %e\n",l,l_pb_ave,(dlam_hi + dlam_lo)/oopz,(l_pb_hi - l_pb_lo)/oopz,l_pb_lo/oopz,l_pb_max/oopz,l_pb_hi/oopz,y_pb_max);
 
 #endif // ALTERNATE_LINE_EMISSION
 
@@ -505,10 +557,11 @@ int main(int argc, char **argv)
     dlambda_pb = (dlam_hi + dlam_lo)*(1+z); //band width in Ang, in observed frame
     double lambda_line_obs;
     double fac_pb;
-    for(il=0;il<n_lines;il++)
+    //printf("n_emission_lines %d\n",n_emission_lines);
+    for(il=0;il<n_emission_lines;il++)
     {
       //find observed wavelength of line
-      lambda_line_obs = lambda_lines[il] * (1+z);
+      lambda_line_obs = lambda_emission_lines[il] * (1+z);
 
       //printf("llo %e\n",lambda_line_obs);
 
@@ -519,7 +572,7 @@ int main(int argc, char **argv)
         //this line falls in the pass band
 
         //find f_lambda in Jy * Hz/Ang
-        y_T = f_nu_lines[il] / dlambda_pb;
+        y_T = f_nu_emission_lines[il] / dlambda_pb;
 
         //moderate by the pass band
         i_lo = gsl_interp_bsearch(x_pb,lambda_line_obs,0,n_pb);
@@ -530,8 +583,15 @@ int main(int argc, char **argv)
 
 
         //printf("BANDWIDTH lambda_lines[%d] %e y_T %e\n",il,lambda_lines[il],y_T*fac_pb);
+        //apply dust 
+        //printf("lambda_emission_lines %e lambda_line %e\n",lambda_emission_lines[il],lambda_line[il]);
+        kp = klambda_smc(lambda_emission_lines[il] * 1.0e-4);
+        if(lambda_emission_lines[il]  * 1.0e-4 < lyman_limit * 1.0e-4)
+          kp = 0.0;
+        AEBV = -0.4*ebv*kp;
 
-        fT += y_T * fac_pb;
+        //if( 0.5*(y_pb[i_lo]+y_pb[i_lo+1])>1.0e-3)
+        fT +=  y_T * fac_pb * (1 - f_esc) * pow(10.0, AEBV);
 
         //#error check factors of 1+z
       }

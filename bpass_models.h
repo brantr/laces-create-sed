@@ -53,9 +53,9 @@ void load_cont_model(char fname[], double z, double lNlyc);
 void free_line_strength_buffers(void);
 void rescale_line_strengths(double z, double lNlyc);
 
-extern int n_lines;
-extern double *f_nu_lines;
-extern double *lambda_lines;
+extern int n_emission_lines;
+extern double *f_nu_emission_lines;
+extern double *lambda_emission_lines;
 #endif // ALTERNATE_LINE_EMISSION
 
 //initialize the bpass models

@@ -37,9 +37,9 @@ double *lambda_line;    //array of wavelengths
 
 
 #ifdef ALTERNATE_LINE_EMISSION
-int n_lines;
-double *f_nu_lines;
-double *lambda_lines;
+int n_emission_lines;
+double *f_nu_emission_lines;
+double *lambda_emission_lines;
 #endif //ALTERNATE_LINE_EMISSION
 
 //cont model 
@@ -455,8 +455,8 @@ void load_sed_model(char fname[], double z)
 
   //The distance modulus to z=3.10 = 4.563294e+01
 
-  printf("l[0] %e f[0] %e\n",lambda[0],f_nu[0]);
-  printf("l[%d] %e f[%d] %e\n",n_lambda-1,lambda[n_lambda-1],n_lambda-1,f_nu[n_lambda-1]);
+  //printf("l[0] %e f[0] %e\n",lambda[0],f_nu[0]);
+  //printf("l[%d] %e f[%d] %e\n",n_lambda-1,lambda[n_lambda-1],n_lambda-1,f_nu[n_lambda-1]);
 
   fclose(fp);
   //exit(0);
@@ -465,8 +465,8 @@ void load_sed_model(char fname[], double z)
 #ifdef ALTERNATE_LINE_EMISSION
 void free_line_strength_buffers(void)
 {
-  free(lambda_lines);
-  free(f_nu_lines);
+  free(lambda_emission_lines);
+  free(f_nu_emission_lines);
 }
 
 void rescale_line_strengths(double z, double lNlyc)
@@ -497,20 +497,20 @@ void rescale_line_strengths(double z, double lNlyc)
   printf("nll = %d fn %s\n",nll,fname);
 
   //allocate line buffers
-  n_lines = nll;
-  lambda_lines = (double *) malloc(n_lines*sizeof(double));
-  f_nu_lines   = (double *) malloc(n_lines*sizeof(double));
+  n_emission_lines = nll;
+  lambda_emission_lines = (double *) malloc(n_emission_lines*sizeof(double));
+  f_nu_emission_lines   = (double *) malloc(n_emission_lines*sizeof(double));
 
-  for(i=0;i<n_lines;i++)
+  for(i=0;i<n_emission_lines;i++)
   {
     fscanf(fp,"%lf\t%lf\n",&xb,&yb);
-    lambda_lines[i] = xb * 1.0e4; //in Ang in the rest frame
+    lambda_emission_lines[i] = xb * 1.0e4; //in Ang in the rest frame
 
     //record the line flux
-    f_nu_lines[i]   = yb;
-    f_nu_lines[i]  *= A_DM/A_10pc / (1+z);  //in erg/s/cm^2, removing the flux density K correction
-    f_nu_lines[i]  /= uJy;             //convert to uJy * Hz in rest frame
-    f_nu_lines[i]  *= pow(10.,lNlyc);  //rescale by Lyman continuum
+    f_nu_emission_lines[i]   = yb;
+    f_nu_emission_lines[i]  *= A_DM/A_10pc / (1+z);  //in erg/s/cm^2, removing the flux density K correction
+    f_nu_emission_lines[i]  /= uJy;             //convert to uJy * Hz in rest frame
+    f_nu_emission_lines[i]  *= pow(10.,lNlyc);  //rescale by Lyman continuum
 
     //f_nu is now in uJy * Hz
   }
@@ -1327,29 +1327,29 @@ void pass_band_average_line_model(int i, int j, int k)
     //dlambda_pb = (dlam_hi + dlam_lo); //band width in Ang, in restframe
     dlambda_pb = (l_pb_hi - l_pb_lo); //band width in Ang, in restframe
     line_model[i][j][k][l] = 0;
-    for(il=0;il<n_lines;il++)
+    for(il=0;il<n_emission_lines;il++)
     {
       //check whether line falls in this pass band
-      if((lambda_lines[il]>=x_pb_o[0])&&(lambda_lines[il]<=x_pb_o[n_pb-1]) )
+      if((lambda_emission_lines[il]>=x_pb_o[0])&&(lambda_emission_lines[il]<=x_pb_o[n_pb-1]) )
       {
 
         //this line falls in the pass band
 
         //find f_lambda in Jy * Hz/Ang
-        y_T = f_nu_lines[il] / dlambda_pb;
+        y_T = f_nu_emission_lines[il] / dlambda_pb;
 
         //moderate by the pass band
-        i_lo = gsl_interp_bsearch(x_pb_o,lambda_lines[il],0,n_pb);
-        y_T *= y_pb[i_lo] + (lambda_lines[il] - x_pb_o[i_lo])*(y_pb[i_lo+1] - y_pb[i_lo])/(x_pb_o[i_lo+1] - x_pb_o[i_lo]);
+        i_lo = gsl_interp_bsearch(x_pb_o,lambda_emission_lines[il],0,n_pb);
+        y_T *= y_pb[i_lo] + (lambda_emission_lines[il] - x_pb_o[i_lo])*(y_pb[i_lo+1] - y_pb[i_lo])/(x_pb_o[i_lo+1] - x_pb_o[i_lo]);
 
         //at this point y_T is in dF/dlambda x T(lambda)
         //we need to convert to a flux density
         // dF/dnu = dF/dlambda * dlambda/dnu
         // lambda = c/nu dlambda/dnu = c/nu^2 = lambda^2 / c HERE
 
-        y_T *= pow(lambda_lines[il],2) / c; // to Jy in rest-frame
+        y_T *= pow(lambda_emission_lines[il],2) / c; // to Jy in rest-frame
 
-        printf("BANDWIDTH lambda_lines[%d] %e y_T %e\n",il,lambda_lines[il],y_T/T);
+        printf("BANDWIDTH lambda_emission_lines[%d] %e y_T %e\n",il,lambda_emission_lines[il],y_T/T);
 
         line_model[i][j][k][l] += y_T;
 
