@@ -13,10 +13,11 @@
 
 #define FAKE_FESC
 
-//#define FIT_LINE_STRENGTHS
+#define FIT_LINE_STRENGTHS
+
 
 #define LINES
-#define CONT
+//#define CONT
 
 char **load_z_met_filenames(void);
 void allocate_sed_buffers(void);
@@ -64,20 +65,24 @@ int main(int argc, char **argv)
 		agei = atof(argv[3]);
 	if(argc>=5)
 		f_esc = atof(argv[4]);
-#ifndef FIT_LINE_STRENGTHS
-
   if(argc>=6)
     ebv = atof(argv[5]);
+
+#ifndef FIT_LINE_STRENGTHS
+
+
   if(argc>=7)
     flag_binary = atoi(argv[6]);
 
 
 #else //FIT_LINE_STRENGTHS
+
+
   double B_line;
-  if(argc>=6)
-    B_line = atof(argv[5]);
   if(argc>=7)
-    flag_binary = atoi(argv[6]);
+    B_line = atof(argv[6]);
+  if(argc>=8)
+    flag_binary = atoi(argv[7]);
 #endif //FIT_LINE_STRENGTHS
 
 
@@ -92,9 +97,9 @@ int main(int argc, char **argv)
   if(argc>=6)
     printf("flag_binary = %d\n",flag_binary);
 #else //FIT_LINE_STRENGTHS
-  if(argc>=6)
-    printf("B_line = %e\n",B_line);
   if(argc>=7)
+    printf("B_line = %e\n",B_line);
+  if(argc>=8)
     printf("flag_binary = %d\n",flag_binary);
 #endif //FIT_LINE_STRENGTHS
   printf("dm    = %e\n",dm);
@@ -591,8 +596,11 @@ int main(int argc, char **argv)
         AEBV = -0.4*ebv*kp;
 
         //if( 0.5*(y_pb[i_lo]+y_pb[i_lo+1])>1.0e-3)
+#ifndef FIT_LINE_STRENGTHS
         fT +=  y_T * fac_pb * (1 - f_esc) * pow(10.0, AEBV);
-
+#else
+        fT +=  y_T * fac_pb * B_line * pow(10.0, AEBV);
+#endif 
         //#error check factors of 1+z
       }
     }
@@ -620,7 +628,7 @@ int main(int argc, char **argv)
 
   j_nu_hbeta *= areal_factor(z);
 #ifdef FIT_LINE_STRENGTHS
-  j_nu_hbeta *= B_line;
+  j_nu_hbeta = 4.78e-13*B_line*pow(10.0,Nlyc);
 #endif //FIT_LINE_STRENGTHS
 
   fpsed = fopen("sed.lines.txt","w");
