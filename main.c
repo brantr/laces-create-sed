@@ -308,7 +308,9 @@ int main(int argc, char **argv)
 
 
 #ifdef LINES
-    f_tot += (1.0-f_esc)*f_line;
+    //f_tot += (1.0-f_esc)*f_line;
+    f_tot += f_line;
+
 #endif 
 #ifdef CONT
     f_tot += (1.0-f_esc)*f_cont;
