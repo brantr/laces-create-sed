@@ -17,7 +17,7 @@
 
 
 #define LINES
-//#define CONT
+#define CONT
 
 char **load_z_met_filenames(void);
 void allocate_sed_buffers(void);
